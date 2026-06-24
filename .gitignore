@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+
+# 项目数据（不提交用户数据，只保留示例）
+todos.json
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# 临时文件
+gh.zip
+gh-extract/
+
+# 忽略所有用户目录文件，只跟踪明确添加的项目文件
+/*
+!/todo_manager.py
+!/README.md
+!/.gitignore
