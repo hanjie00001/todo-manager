@@ -234,3 +234,190 @@ class TodoManager:
         if total > 0:
             print(f"  完成率:   {done/total*100:.1f}%")
         print(f"{'='*40}\n")
+
+
+class MenuApp:
+    """简单菜单应用程序。"""
+
+    def __init__(self):
+        self.manager = TodoManager()
+
+    def clear_screen(self):
+        """清屏。"""
+        os.system("cls" if os.name == "nt" else "clear")
+
+    def print_header(self):
+        """打印程序标题。"""
+        print(f"\n{'★'*50}")
+        print(f"   个 人 待 办 事 项 管 理 器")
+        print(f"{'★'*50}")
+
+    def pause(self):
+        """暂停等待用户按键。"""
+        input("\n按 Enter 键继续...")
+
+    def input_date(self, prompt="请输入截止日期"):
+        """输入并验证日期。"""
+        print(f"{prompt} (格式: YYYY-MM-DD，直接回车表示无截止日期): ")
+        date_str = input("> ").strip()
+        if not date_str:
+            return None
+        try:
+            datetime.strptime(date_str, "%Y-%m-%d")
+            return date_str
+        except ValueError:
+            print("⚠️  日期格式错误，将设置为无截止日期。")
+            return None
+
+    def run(self):
+        """运行主菜单循环。"""
+        while True:
+            self.clear_screen()
+            self.print_header()
+
+            print("\n  ┌─ 主菜单 ───────────────────────────┐")
+            print("  │  1. 添加待办事项                     │")
+            print("  │  2. 查看待办事项                     │")
+            print("  │  3. 标记为已完成                     │")
+            print("  │  4. 删除待办事项                     │")
+            print("  │  5. 查看统计                         │")
+            print("  │  0. 退出                             │")
+            print("  └──────────────────────────────────────┘")
+
+            choice = input("\n请选择操作 (0-5): ").strip()
+
+            if choice == "1":
+                self.add_todo()
+            elif choice == "2":
+                self.list_todos()
+            elif choice == "3":
+                self.mark_done()
+            elif choice == "4":
+                self.delete_menu()
+            elif choice == "5":
+                self.show_stats()
+            elif choice == "0":
+                print("\n👋 感谢使用！再见！")
+                break
+            else:
+                print("\n⚠️  无效选择，请重新输入。")
+                self.pause()
+
+    def add_todo(self):
+        """添加待办事项菜单。"""
+        self.clear_screen()
+        print("\n┌─ 添加待办事项 ─────────────────────┐")
+        print("│  按 Ctrl+C 可取消                   │")
+        print("└──────────────────────────────────────┘")
+
+        content = input("\n待办内容: ").strip()
+        if not content:
+            print("❌ 内容不能为空！")
+            self.pause()
+            return
+
+        print("\n优先级:")
+        print("  1. 高")
+        print("  2. 中")
+        print("  3. 低")
+        pri_choice = input("请选择 (1-3，默认 2): ").strip()
+        priority_map = {"1": "高", "2": "中", "3": "低", "": "中"}
+        priority = priority_map.get(pri_choice, "中")
+
+        due_date = self.input_date()
+
+        print("\n" + "─" * 40)
+        self.manager.add(content, priority, due_date)
+        self.pause()
+
+    def list_todos(self):
+        """查看待办事项菜单。"""
+        self.clear_screen()
+
+        print("\n排序方式:")
+        print("  1. 按优先级 (高→低)")
+        print("  2. 按截止日期 (近→远)")
+        sort_choice = input("请选择 (1-2，默认 1): ").strip()
+        sort_by = "due_date" if sort_choice == "2" else "priority"
+
+        print("\n状态筛选:")
+        print("  1. 全部")
+        print("  2. 未完成")
+        print("  3. 已完成")
+        filter_choice = input("请选择 (1-3，默认 1): ").strip()
+        filter_map = {"1": "all", "2": "pending", "3": "done", "": "all"}
+        status_filter = filter_map.get(filter_choice, "all")
+
+        self.manager.list_all(sort_by=sort_by, status_filter=status_filter)
+        self.pause()
+
+    def mark_done(self):
+        """标记完成菜单。"""
+        self.clear_screen()
+
+        # 先显示未完成的事项
+        self.manager.list_all(sort_by="priority", status_filter="pending")
+
+        todo_id_str = input("请输入要标记为完成的待办事项 ID (输入 0 返回): ").strip()
+        if todo_id_str == "0":
+            return
+        try:
+            todo_id = int(todo_id_str)
+            self.manager.mark_done(todo_id)
+        except ValueError:
+            print("❌ 无效的ID格式！")
+        self.pause()
+
+    def delete_menu(self):
+        """删除待办事项菜单。"""
+        self.clear_screen()
+
+        print("\n  ┌─ 删除操作 ────────────────────────┐")
+        print("  │  1. 删除所有已完成事项             │")
+        print("  │  2. 按ID删除指定事项               │")
+        print("  │  0. 返回主菜单                     │")
+        print("  └──────────────────────────────────────┘")
+
+        choice = input("\n请选择 (0-2): ").strip()
+
+        if choice == "1":
+            self.manager.delete_done()
+            self.pause()
+        elif choice == "2":
+            self.manager.list_all(sort_by="priority", status_filter="all")
+            todo_id_str = input("请输入要删除的待办事项 ID (输入 0 返回): ").strip()
+            if todo_id_str == "0":
+                return
+            try:
+                todo_id = int(todo_id_str)
+                confirmed = input(f"确定要删除ID为 {todo_id} 的事项吗？(y/n, 默认 n): ").strip().lower()
+                if confirmed == "y":
+                    self.manager.delete_by_id(todo_id)
+                else:
+                    print("已取消删除。")
+            except ValueError:
+                print("❌ 无效的ID格式！")
+            self.pause()
+        elif choice == "0":
+            return
+        else:
+            print("\n⚠️  无效选择。")
+            self.pause()
+
+    def show_stats(self):
+        """显示统计菜单。"""
+        self.clear_screen()
+        self.manager.stats()
+        self.pause()
+
+
+if __name__ == "__main__":
+    try:
+        app = MenuApp()
+        app.run()
+    except KeyboardInterrupt:
+        print("\n\n👋 感谢使用！再见！")
+    except Exception as e:
+        print(f"\n❌ 程序出错: {e}")
+        import traceback
+        traceback.print_exc()
