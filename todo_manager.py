@@ -93,3 +93,144 @@ class TodoItem:
     def short_str(self):
         status = "✓" if self.completed else "▢"
         return f"{status} #{self.id} {self.content[:30]}{'...' if len(self.content) > 30 else ''}"
+
+
+class TodoManager:
+    """待办事项管理器，负责数据的增删改查和持久化。"""
+
+    def __init__(self, data_file=DATA_FILE):
+        self.data_file = data_file
+        self.items = []  # type: list[TodoItem]
+        self._load()
+
+    def _load(self):
+        """从JSON文件加载数据。"""
+        if not os.path.exists(self.data_file):
+            self.items = []
+            return
+        try:
+            with open(self.data_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            self.items = [TodoItem.from_dict(d) for d in data]
+        except (json.JSONDecodeError, FileNotFoundError, KeyError):
+            print("⚠️  数据文件损坏，已重置为空列表。")
+            self.items = []
+
+    def _save(self):
+        """保存数据到JSON文件。"""
+        with open(self.data_file, "w", encoding="utf-8") as f:
+            json.dump([item.to_dict() for item in self.items], f, ensure_ascii=False, indent=2)
+
+    def add(self, content, priority="中", due_date=None):
+        """添加一个新的待办事项。"""
+        if not content or not content.strip():
+            print("❌ 内容不能为空！")
+            return False
+        item = TodoItem(content.strip(), priority, due_date)
+        self.items.append(item)
+        self._save()
+        print(f"✅ 已添加: {item}")
+        return True
+
+    def list_all(self, sort_by="priority", status_filter="all"):
+        """
+        查看待办事项列表。
+
+        :param sort_by: "priority" 按优先级降序, "due_date" 按截止日期升序
+        :param status_filter: "all" 全部, "pending" 未完成, "done" 已完成
+        """
+        # 筛选
+        if status_filter == "pending":
+            filtered = [item for item in self.items if not item.completed]
+        elif status_filter == "done":
+            filtered = [item for item in self.items if item.completed]
+        else:
+            filtered = list(self.items)
+
+        if not filtered:
+            status_msg = {"all": "没有任何待办事项",
+                         "pending": "没有未完成的待办事项",
+                         "done": "没有已完成的待办事项"}
+            print(f"📭 {status_msg.get(status_filter, '没有任何待办事项')}")
+            return
+
+        # 排序
+        if sort_by == "due_date":
+            def sort_key(item):
+                if item.due_date:
+                    return (0, item.due_date)
+                return (1, "")
+            filtered.sort(key=sort_key)
+        else:  # priority
+            filtered.sort(key=lambda x: x.priority, reverse=True)
+
+        # 显示
+        status_label = {"all": "全部", "pending": "未完成", "done": "已完成"}
+        sort_label = {"priority": "优先级(高→低)", "due_date": "截止日期(近→远)"}
+
+        print(f"\n{'='*60}")
+        print(f"  待办事项列表 | 筛选: {status_label[status_filter]} | 排序: {sort_label[sort_by]}")
+        print(f"{'='*60}")
+        for i, item in enumerate(filtered, 1):
+            print(f"{i:3d}. {item}")
+        print(f"{'='*60}")
+        print(f"  共 {len(filtered)} 项")
+        print(f"{'='*60}\n")
+
+    def mark_done(self, todo_id):
+        """标记指定ID的待办事项为已完成。"""
+        for item in self.items:
+            if item.id == todo_id:
+                if item.completed:
+                    print(f"⚠️  该项已完成: {item.short_str()}")
+                    return False
+                item.completed = True
+                self._save()
+                print(f"✅ 已标记完成: {item.short_str()}")
+                return True
+        print(f"❌ 未找到ID为 {todo_id} 的待办事项")
+        return False
+
+    def delete_done(self):
+        """删除所有已完成的待办事项。"""
+        done_items = [item for item in self.items if item.completed]
+        if not done_items:
+            print("📭 没有已完成的待办事项可删除。")
+            return False
+        self.items = [item for item in self.items if not item.completed]
+        self._save()
+        print(f"🗑️  已删除 {len(done_items)} 条已完成事项:")
+        for item in done_items:
+            print(f"   - {item.short_str()}")
+        return True
+
+    def delete_by_id(self, todo_id):
+        """删除指定ID的待办事项（无论是否完成）。"""
+        for i, item in enumerate(self.items):
+            if item.id == todo_id:
+                removed = self.items.pop(i)
+                self._save()
+                print(f"🗑️  已删除: {removed.short_str()}")
+                return True
+        print(f"❌ 未找到ID为 {todo_id} 的待办事项")
+        return False
+
+    def stats(self):
+        """显示统计信息。"""
+        total = len(self.items)
+        done = sum(1 for item in self.items if item.completed)
+        pending = total - done
+
+        if total == 0:
+            print("📭 没有任何待办事项。")
+            return
+
+        print(f"\n{'='*40}")
+        print(f"  待办事项统计")
+        print(f"{'='*40}")
+        print(f"  总计:     {total} 项")
+        print(f"  已完成:   {done} 项")
+        print(f"  未完成:   {pending} 项")
+        if total > 0:
+            print(f"  完成率:   {done/total*100:.1f}%")
+        print(f"{'='*40}\n")
